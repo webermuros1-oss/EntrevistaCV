@@ -10,40 +10,43 @@ const STATES = {
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
-const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:3001'
-const BARGE_IN_THRESHOLD = 25   // energy 0-255
+const DEEPGRAM_API_KEY = import.meta.env.VITE_DEEPGRAM_API_KEY
+const GROQ_API_KEY     = import.meta.env.VITE_GROQ_API_KEY
+const GROQ_API_URL     = 'https://api.groq.com/openai/v1/chat/completions'
+const BARGE_IN_THRESHOLD = 25
+
+const SYSTEM_PROMPT =
+  'You are a friendly English teacher for beginners. ' +
+  'ONLY use basic words (A1-A2). ' +
+  'Write SHORT sentences max 10 words. ' +
+  'Correct mistakes gently. ' +
+  'Ask ONE simple question at the end. ' +
+  'Be warm and encouraging.'
 
 // ─── Hook ────────────────────────────────────────────────────────────────────
 export function useVoiceConversation() {
-  const [convState,    setConvState]    = useState(STATES.IDLE)
-  const [partialText,  setPartialText]  = useState('')
-  const [userText,     setUserText]     = useState('')
-  const [aiText,       setAiText]       = useState('')
-  const [error,        setError]        = useState(null)
+  const [convState,   setConvState]   = useState(STATES.IDLE)
+  const [partialText, setPartialText] = useState('')
+  const [userText,    setUserText]    = useState('')
+  const [aiText,      setAiText]      = useState('')
+  const [error,       setError]       = useState(null)
 
-  // Refs for use inside closures / rAF loops
-  const wsRef          = useRef(null)
-  const recorderRef    = useRef(null)
-  const streamRef      = useRef(null)
-  const animFrameRef   = useRef(null)
-  const convStateRef   = useRef(STATES.IDLE)   // mirror of convState
-  const analyserRef    = useRef(null)
-  const audioCtxRef    = useRef(null)
+  // Refs — no server WebSocket anymore, connect directly to Deepgram
+  const dgWsRef       = useRef(null)   // Deepgram WebSocket
+  const recorderRef   = useRef(null)
+  const streamRef     = useRef(null)
+  const animFrameRef  = useRef(null)
+  const convStateRef  = useRef(STATES.IDLE)
+  const analyserRef   = useRef(null)
+  const audioCtxRef   = useRef(null)
+  const isMutedRef    = useRef(false)           // true while AI speaks → ignore Deepgram
+  const pendingRef    = useRef('')              // accumulates final transcript chunks
+  const historyRef    = useRef([])             // conversation history for Groq
 
-  // Keep ref in sync
-  useEffect(() => {
-    convStateRef.current = convState
-  }, [convState])
+  // Keep convStateRef in sync
+  useEffect(() => { convStateRef.current = convState }, [convState])
 
-  // ─── Helpers ───────────────────────────────────────────────────────────────
-  function sendWS(obj) {
-    const ws = wsRef.current
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify(obj))
-    }
-  }
-
-  // ─── VAD loop ──────────────────────────────────────────────────────────────
+  // ─── VAD (barge-in detection) ─────────────────────────────────────────────
   function startVAD(stream) {
     try {
       const ctx      = new (window.AudioContext || window.webkitAudioContext)()
@@ -61,14 +64,13 @@ export function useVoiceConversation() {
         analyser.getByteFrequencyData(dataArr)
         const avg = dataArr.reduce((s, v) => s + v, 0) / dataArr.length
 
-        // Barge-in: user speaks while AI is talking
+        // User speaks while AI talking → barge-in
         if (convStateRef.current === STATES.SPEAKING && avg > BARGE_IN_THRESHOLD) {
           window.speechSynthesis.cancel()
-          sendWS({ type: 'interrupt' })
+          isMutedRef.current = false
           setConvState(STATES.LISTENING)
         }
       }
-
       loop()
     } catch (e) {
       console.warn('[VAD] Could not start AudioContext:', e)
@@ -87,16 +89,35 @@ export function useVoiceConversation() {
     analyserRef.current = null
   }
 
-  // ─── speakText ─────────────────────────────────────────────────────────────
+  // ─── Groq API (direct fetch, same pattern as useChat) ────────────────────
+  async function callGroq(history) {
+    const res = await fetch(GROQ_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'Authorization': `Bearer ${GROQ_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model:       'llama-3.1-8b-instant',
+        messages:    [{ role: 'system', content: SYSTEM_PROMPT }, ...history],
+        max_tokens:  150,
+        temperature: 0.7,
+      }),
+    })
+    if (!res.ok) throw new Error(`Groq HTTP ${res.status}`)
+    const data = await res.json()
+    return data.choices?.[0]?.message?.content ?? ''
+  }
+
+  // ─── speakText (Web Speech API) ───────────────────────────────────────────
   const speakText = useCallback((text) => {
     window.speechSynthesis.cancel()
 
-    const utter    = new SpeechSynthesisUtterance(text)
-    utter.lang     = 'en-US'
-    utter.rate     = 0.9
+    const utter   = new SpeechSynthesisUtterance(text)
+    utter.lang    = 'en-US'
+    utter.rate    = 0.9
 
-    // Try to find an en-US voice
-    const voices = window.speechSynthesis.getVoices()
+    const voices  = window.speechSynthesis.getVoices()
     const enVoice = voices.find(v => v.lang.startsWith('en-US')) ||
                     voices.find(v => v.lang.startsWith('en'))
     if (enVoice) utter.voice = enVoice
@@ -105,14 +126,10 @@ export function useVoiceConversation() {
     function handleDone() {
       if (done) return
       done = true
-      sendWS({ type: 'speaking_done' })
+      isMutedRef.current = false
       setConvState(STATES.LISTENING)
     }
 
-    utter.onend   = handleDone
-    utter.onerror = handleDone
-
-    // Safety timeout
     const safetyTimer = setTimeout(() => {
       if (convStateRef.current === STATES.SPEAKING) {
         window.speechSynthesis.cancel()
@@ -120,14 +137,38 @@ export function useVoiceConversation() {
       }
     }, 15000)
 
-    utter.onend = () => { clearTimeout(safetyTimer); handleDone() }
+    utter.onend   = () => { clearTimeout(safetyTimer); handleDone() }
     utter.onerror = () => { clearTimeout(safetyTimer); handleDone() }
 
+    isMutedRef.current = true
     setConvState(STATES.SPEAKING)
     window.speechSynthesis.speak(utter)
   }, [])
 
-  // ─── stop ──────────────────────────────────────────────────────────────────
+  // ─── processUserTurn ──────────────────────────────────────────────────────
+  async function processUserTurn(text) {
+    if (!text.trim()) return
+
+    setConvState(STATES.PROCESSING)
+    historyRef.current.push({ role: 'user', content: text })
+
+    let response = ''
+    try {
+      response = await callGroq(historyRef.current)
+    } catch (err) {
+      console.error('[Groq] Error:', err.message)
+      setError('Could not reach AI. Check your connection.')
+      setConvState(STATES.LISTENING)
+      isMutedRef.current = false
+      return
+    }
+
+    historyRef.current.push({ role: 'assistant', content: response })
+    setAiText(response)
+    speakText(response)
+  }
+
+  // ─── stop ─────────────────────────────────────────────────────────────────
   const stop = useCallback(() => {
     window.speechSynthesis.cancel()
     stopVAD()
@@ -142,34 +183,46 @@ export function useVoiceConversation() {
       streamRef.current = null
     }
 
-    const ws = wsRef.current
-    if (ws) {
-      try { ws.send(JSON.stringify({ type: 'stop' })) } catch (_) {}
-      ws.close()
-      wsRef.current = null
+    if (dgWsRef.current) {
+      try { dgWsRef.current.close() } catch (_) {}
+      dgWsRef.current = null
     }
 
+    historyRef.current    = []
+    isMutedRef.current    = false
+    pendingRef.current    = ''
     setConvState(STATES.IDLE)
     setPartialText('')
   }, [])
 
-  // ─── start ─────────────────────────────────────────────────────────────────
+  // ─── start ────────────────────────────────────────────────────────────────
   const start = useCallback(async () => {
     setError(null)
     setConvState(STATES.CONNECTING)
     setPartialText('')
     setUserText('')
     setAiText('')
+    historyRef.current = []
+    isMutedRef.current = false
+    pendingRef.current = ''
 
-    // 1. Get mic
+    // 1. Check API keys
+    if (!DEEPGRAM_API_KEY) {
+      setError('VITE_DEEPGRAM_API_KEY not configured.')
+      setConvState(STATES.IDLE)
+      return
+    }
+    if (!GROQ_API_KEY) {
+      setError('VITE_GROQ_API_KEY not configured.')
+      setConvState(STATES.IDLE)
+      return
+    }
+
+    // 2. Get microphone
     let stream
     try {
       stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          channelCount: 1,
-        },
+        audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 },
       })
     } catch (e) {
       setError('Microphone access denied. Please allow microphone and try again.')
@@ -178,79 +231,89 @@ export function useVoiceConversation() {
     }
     streamRef.current = stream
 
-    // 2. Connect WebSocket
-    let ws
+    // 3. Connect directly to Deepgram WebSocket (same params the server was using)
+    const dgUrl = [
+      'wss://api.deepgram.com/v1/listen',
+      `?token=${DEEPGRAM_API_KEY}`,
+      '&model=nova-2',
+      '&language=en-US',
+      '&smart_format=true',
+      '&interim_results=true',
+      '&endpointing=500',
+      '&utterance_end_ms=1500',
+      '&vad_events=true',
+    ].join('')
+
+    let dgWs
     try {
-      ws = new WebSocket(WS_URL)
+      dgWs = new WebSocket(dgUrl)
     } catch (e) {
-      setError('Cannot connect to server. Please try again in a few seconds.')
+      setError('Cannot connect to speech service. Check your API key.')
       stream.getTracks().forEach(t => t.stop())
       setConvState(STATES.IDLE)
       return
     }
-    wsRef.current = ws
-    ws.binaryType = 'arraybuffer'
+    dgWsRef.current  = dgWs
+    dgWs.binaryType  = 'arraybuffer'
 
-    ws.onerror = () => {
-      setError('Cannot connect to server. Please try again in a few seconds.')
+    dgWs.onerror = () => {
+      setError('Speech service error. Please check your Deepgram API key.')
       setConvState(STATES.IDLE)
     }
 
-    ws.onclose = () => {
-      if (convStateRef.current !== STATES.IDLE) {
-        setConvState(STATES.IDLE)
-      }
+    dgWs.onclose = () => {
+      if (convStateRef.current !== STATES.IDLE) setConvState(STATES.IDLE)
     }
 
-    ws.onmessage = (event) => {
+    // 4. Handle Deepgram messages (same logic the server had)
+    dgWs.onmessage = (event) => {
       let msg
-      try {
-        msg = JSON.parse(event.data)
-      } catch {
+      try { msg = JSON.parse(event.data) } catch { return }
+
+      // UtteranceEnd fallback
+      if (msg.type === 'UtteranceEnd') {
+        if (isMutedRef.current) return
+        if (pendingRef.current.trim()) {
+          const toProcess   = pendingRef.current
+          pendingRef.current = ''
+          processUserTurn(toProcess)
+        }
         return
       }
 
-      switch (msg.type) {
-        case 'state':
-          // Map server state strings to our STATES enum values
-          {
-            const map = {
-              idle:       STATES.IDLE,
-              listening:  STATES.LISTENING,
-              processing: STATES.PROCESSING,
-              speaking:   STATES.SPEAKING,
-            }
-            if (map[msg.state]) setConvState(map[msg.state])
-          }
-          break
+      // Transcript event
+      const alt        = msg?.channel?.alternatives?.[0]
+      if (!alt) return
 
-        case 'transcript':
-          if (msg.isFinal) {
-            setUserText(msg.text)
-            setPartialText('')
-          } else {
-            setPartialText(msg.text)
-          }
-          break
+      const text       = alt.transcript ?? ''
+      const isFinal    = msg.is_final   ?? false
+      const speechFinal = msg.speech_final ?? false
 
-        case 'response':
-          setAiText(msg.text)
-          speakText(msg.text)
-          break
+      if (isMutedRef.current) return
 
-        case 'error':
-          setError(msg.message)
-          break
+      if (!isFinal) {
+        if (text) setPartialText(text)
+        return
+      }
 
-        default:
-          break
+      // Final transcript chunk
+      if (text.trim()) {
+        pendingRef.current = (pendingRef.current + ' ' + text).trim()
+        setUserText(pendingRef.current)
+        setPartialText('')
+      }
+
+      if (speechFinal && pendingRef.current.trim()) {
+        const toProcess   = pendingRef.current
+        pendingRef.current = ''
+        processUserTurn(toProcess)
       }
     }
 
-    ws.onopen = () => {
-      ws.send(JSON.stringify({ type: 'start' }))
+    // 5. On open → start MediaRecorder + VAD
+    dgWs.onopen = () => {
+      setConvState(STATES.LISTENING)
 
-      // 3. MediaRecorder
       const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
         ? 'audio/webm;codecs=opus'
         : 'audio/webm'
@@ -260,7 +323,7 @@ export function useVoiceConversation() {
         recorder = new MediaRecorder(stream, { mimeType })
       } catch (e) {
         setError('MediaRecorder not supported in this browser.')
-        ws.close()
+        dgWs.close()
         stream.getTracks().forEach(t => t.stop())
         setConvState(STATES.IDLE)
         return
@@ -268,33 +331,18 @@ export function useVoiceConversation() {
       recorderRef.current = recorder
 
       recorder.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0 && ws.readyState === WebSocket.OPEN) {
-          ws.send(e.data)
+        if (e.data?.size > 0 && dgWs.readyState === WebSocket.OPEN && !isMutedRef.current) {
+          dgWs.send(e.data)
         }
       }
 
-      recorder.start(100)   // emit chunks every 100 ms
-
-      // 4. VAD
+      recorder.start(100)  // chunk every 100ms
       startVAD(stream)
     }
   }, [speakText])
 
   // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      stop()
-    }
-  }, [stop])
+  useEffect(() => { return () => { stop() } }, [stop])
 
-  return {
-    convState,
-    partialText,
-    userText,
-    aiText,
-    error,
-    start,
-    stop,
-    STATES,
-  }
+  return { convState, partialText, userText, aiText, error, start, stop, STATES }
 }
