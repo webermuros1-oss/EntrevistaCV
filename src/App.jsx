@@ -35,14 +35,6 @@ export default function App() {
     sendMessage(simplifyText(text))
   }, [validateInput, simplifyText, sendMessage])
 
-  // Called by useSpeech when TTS finishes (or fails) — only restart trigger
-  const handleSpeakEnd = useCallback(() => {
-    if (!convoModeRef.current) return
-    setTimeout(() => {
-      if (convoModeRef.current) startListening()  // ref resolved below
-    }, 400)
-  }, [])  // startListening injected via ref to avoid circular dep
-
   const startListeningRef = useRef(null)
   const handleSpeakEndSafe = useCallback(() => {
     if (!convoModeRef.current) return
@@ -129,10 +121,30 @@ export default function App() {
       </div>
     </div>
 
-    {mode === 'voice' && <div className="pt-12"><VoiceUI langCode={langCode} onLangChange={setLangCode} /></div>}
+    {mode === 'voice' && (
+      <div className="pt-12 parlare-bg min-h-screen flex flex-col items-center px-4">
+        {/* Picker encima de la card de voz */}
+        <div className="w-full max-w-sm mt-4 mb-3 parlare-card rounded-3xl p-4 parlare-glow-purple">
+          <LanguagePicker
+            selected={langCode}
+            onChange={setLangCode}
+          />
+        </div>
+        <VoiceUI langCode={langCode} />
+      </div>
+    )}
 
     {mode === 'chat' && (
-    <div className="pt-20 parlare-bg flex flex-col items-center justify-center p-4">
+    <div className="pt-12 parlare-bg flex flex-col items-center p-4">
+      {/* Picker encima de la card de chat — solo antes de empezar */}
+      {messages.length <= 1 && !loading && (
+        <div className="w-full max-w-md mb-3 parlare-card rounded-3xl p-4 parlare-glow-purple">
+          <LanguagePicker
+            selected={langCode}
+            onChange={(code) => { setLangCode(code); clearChat() }}
+          />
+        </div>
+      )}
       <div className="w-full max-w-md parlare-card rounded-3xl shadow-2xl overflow-hidden flex flex-col parlare-glow-purple"
            style={{ height: '90vh', maxHeight: '700px' }}>
 
@@ -226,11 +238,10 @@ export default function App() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Language picker + Example prompts */}
+        {/* Example prompts */}
         {messages.length <= 1 && !loading && (
           <div className="px-4 pb-3 pt-3" style={{ borderTop: '1px solid rgba(123,47,255,0.15)' }}>
-            <LanguagePicker selected={langCode} onChange={(code) => { setLangCode(code); clearChat() }} />
-            <p className="text-xs text-center mt-3 mb-2" style={{ color: 'rgba(160,140,210,0.5)' }}>Try saying:</p>
+            <p className="text-xs text-center mb-2" style={{ color: 'rgba(160,140,210,0.5)' }}>Try saying:</p>
             <div className="flex flex-wrap gap-1 justify-center">
               {EXAMPLE_PROMPTS.map(p => (
                 <button key={p} onClick={() => handleSend(p)}
