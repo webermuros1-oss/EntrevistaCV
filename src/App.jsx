@@ -7,7 +7,7 @@ import ChatInput from './components/ChatInput'
 import VoiceUI from './components/VoiceUI'
 import LanguagePicker from './components/LanguagePicker'
 import logo from './public/img/logoParlare.png'
-import { DEFAULT_LANG } from './config/languages'
+import { DEFAULT_LANG, LANGUAGES } from './config/languages'
 
 const EXAMPLE_PROMPTS = [
   'Hello! What is your name?',
@@ -123,12 +123,13 @@ export default function App() {
         </button>
       </div>
 
-      {/* Spacer para centrar tabs */}
-      <div className="w-8" />
+      {/* Idioma activo — indicador */}
+      <div className="text-lg w-8 text-center">
+        {LANGUAGES[langCode]?.flag}
+      </div>
     </div>
-    <LanguagePicker selected={langCode} onChange={setLangCode} />
 
-    {mode === 'voice' && <div className="pt-20"><VoiceUI langCode={langCode} /></div>}
+    {mode === 'voice' && <div className="pt-12"><VoiceUI langCode={langCode} onLangChange={setLangCode} /></div>}
 
     {mode === 'chat' && (
     <div className="pt-20 parlare-bg flex flex-col items-center justify-center p-4">
@@ -225,10 +226,11 @@ export default function App() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Example prompts */}
+        {/* Language picker + Example prompts */}
         {messages.length <= 1 && !loading && (
-          <div className="px-4 pb-2" style={{ borderTop: '1px solid rgba(123,47,255,0.15)' }}>
-            <p className="text-xs text-center mt-2 mb-2" style={{ color: 'rgba(160,140,210,0.5)' }}>Try saying:</p>
+          <div className="px-4 pb-3 pt-3" style={{ borderTop: '1px solid rgba(123,47,255,0.15)' }}>
+            <LanguagePicker selected={langCode} onChange={(code) => { setLangCode(code); clearChat() }} />
+            <p className="text-xs text-center mt-3 mb-2" style={{ color: 'rgba(160,140,210,0.5)' }}>Try saying:</p>
             <div className="flex flex-wrap gap-1 justify-center">
               {EXAMPLE_PROMPTS.map(p => (
                 <button key={p} onClick={() => handleSend(p)}

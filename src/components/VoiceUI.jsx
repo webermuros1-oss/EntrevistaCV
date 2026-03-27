@@ -1,4 +1,5 @@
 import { useVoiceConversation } from '../hooks/useVoiceConversation'
+import LanguagePicker from './LanguagePicker'
 import logo from '../public/img/logoParlare.png'
 
 // ─── Orb config per state ─────────────────────────────────────────────────────
@@ -97,7 +98,7 @@ function VoiceOrb({ state }) {
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
-export default function VoiceUI({ langCode }) {
+export default function VoiceUI({ langCode, onLangChange }) {
   const {
     convState,
     partialText,
@@ -124,13 +125,21 @@ export default function VoiceUI({ langCode }) {
           </div>
         </div>
 
-        {/* ── Orb ── */}
-        <VoiceOrb state={convState} />
-
-        {/* ── State label ── */}
-        <p className="text-center text-sm font-medium -mt-4 mb-4" style={{ color: 'rgba(180,160,220,0.75)' }}>
-          {ORB_STYLES[convState]?.label ?? convState}
-        </p>
+        {/* ── Language picker (solo cuando IDLE) ── */}
+        {!isActive && convState === STATES.IDLE ? (
+          <div className="px-4 pt-4 pb-2">
+            <LanguagePicker selected={langCode} onChange={onLangChange} />
+          </div>
+        ) : (
+          <>
+            {/* ── Orb ── */}
+            <VoiceOrb state={convState} />
+            {/* ── State label ── */}
+            <p className="text-center text-sm font-medium -mt-4 mb-4" style={{ color: 'rgba(180,160,220,0.75)' }}>
+              {ORB_STYLES[convState]?.label ?? convState}
+            </p>
+          </>
+        )}
 
         {/* ── Transcript area ── */}
         <div className="mx-4 mb-3 min-h-14 rounded-2xl px-4 py-3 text-sm"
