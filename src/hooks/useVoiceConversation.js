@@ -46,7 +46,7 @@ export function useVoiceConversation() {
       headers,
       body: JSON.stringify({
         model:       'llama-3.1-8b-instant',
-        messages:    [{ role: 'system', content: getSystemPrompt() }, ...history.slice(-MAX_HISTORY)],
+        messages:    [{ role: 'system', content: getSystemPrompt('voice') }, ...history.slice(-MAX_HISTORY)],
         max_tokens:  80,
         temperature: 0.7,
       }),

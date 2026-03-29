@@ -49,7 +49,7 @@ export function useChat() {
       // Limita los mensajes enviados a la API a los últimos MAX_API_MESSAGES
       const recentMessages = updatedMessages.slice(-MAX_API_MESSAGES)
       const apiMessages = [
-        { role: 'system', content: getSystemPrompt() },
+        { role: 'system', content: getSystemPrompt('chat') },
         ...recentMessages.map(({ role, content }) => ({ role, content })),
       ]
 
@@ -63,7 +63,7 @@ export function useChat() {
         body: JSON.stringify({
           model: MODEL,
           messages: apiMessages,
-          max_tokens: 200,
+          max_tokens: 250,
           temperature: 0.7,
           stream: true,
         }),
