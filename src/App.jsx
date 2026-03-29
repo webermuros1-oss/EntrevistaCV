@@ -194,7 +194,7 @@ export default function App() {
         {/* Messages */}
         <div className="flex-1 overflow-y-auto px-4 py-4 chat-scroll"
              style={{ background: 'rgba(0,0,0,0.15)' }}>
-          {messages.map((msg) => <ChatMessage key={msg.id} message={msg} />)}
+          {messages.map((msg) => <ChatMessage key={msg.id} message={msg} onSuggest={handleSend} />)}
 
           {loading && messages[messages.length - 1]?.role !== 'assistant' && (
             <div className="flex justify-start mb-3 message-appear">

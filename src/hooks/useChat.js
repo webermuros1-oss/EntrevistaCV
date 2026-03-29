@@ -76,7 +76,7 @@ export function useChat() {
 
       // Inserta mensaje vacío del asistente y lo rellena token a token
       assistantId = Date.now() + 1
-      setMessages(prev => [...prev, { role: 'assistant', content: '', id: assistantId }])
+      setMessages(prev => [...prev, { role: 'assistant', content: '', suggestions: [], id: assistantId }])
 
       const reader = response.body.getReader()
       const decoder = new TextDecoder()
@@ -93,8 +93,10 @@ export function useChat() {
               const delta = JSON.parse(line.slice(6)).choices?.[0]?.delta?.content || ''
               if (delta) {
                 assistantText += delta
+                // Show only the visible part (before |||) while streaming
+                const visibleText = assistantText.split('|||')[0]
                 setMessages(prev => prev.map(m =>
-                  m.id === assistantId ? { ...m, content: assistantText } : m
+                  m.id === assistantId ? { ...m, content: visibleText } : m
                 ))
               }
             } catch { /* chunk incompleto, ignorar */ }
@@ -103,6 +105,16 @@ export function useChat() {
       }
 
       if (!assistantText) throw new Error('Empty response from API')
+
+      // Parse suggestions from ||| separator
+      const [mainText, suggestionsRaw] = assistantText.split('|||')
+      const suggestions = suggestionsRaw
+        ? suggestionsRaw.split('|').map(s => s.trim()).filter(Boolean).slice(0, 3)
+        : []
+
+      setMessages(prev => prev.map(m =>
+        m.id === assistantId ? { ...m, content: mainText.trim(), suggestions } : m
+      ))
 
     } catch (err) {
       // Error handling
