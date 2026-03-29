@@ -9,6 +9,33 @@ const GROQ_API_URL = IS_PROD
   ? '/api/chat'
   : 'https://api.groq.com/openai/v1/chat/completions'
 const MODEL = 'llama-3.1-8b-instant'
+
+// Fetches 3 short reply suggestions after the main response — non-blocking
+async function fetchSuggestions(aiReply, apiKey, isProd, apiUrl) {
+  try {
+    const headers = { 'Content-Type': 'application/json' }
+    if (!isProd) headers['Authorization'] = `Bearer ${apiKey}`
+    const res = await fetch(apiUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        model: MODEL,
+        messages: [
+          { role: 'system', content: 'Give exactly 3 very short English reply options (under 6 words each) that a beginner could say in response to the message. Reply ONLY with the 3 options separated by | with no extra text. Example: I like music|I stay home|Tell me more' },
+          { role: 'user', content: aiReply },
+        ],
+        max_tokens: 40,
+        temperature: 0.7,
+      }),
+    })
+    if (!res.ok) return []
+    const data = await res.json()
+    const raw = data.choices?.[0]?.message?.content ?? ''
+    return raw.split('|').map(s => s.trim()).filter(Boolean).slice(0, 3)
+  } catch {
+    return []
+  }
+}
 // Máximo de mensajes enviados a la API (el historial visible no se toca)
 const MAX_API_MESSAGES = 50
 
@@ -93,10 +120,8 @@ export function useChat() {
               const delta = JSON.parse(line.slice(6)).choices?.[0]?.delta?.content || ''
               if (delta) {
                 assistantText += delta
-                // Show only the visible part (before |||) while streaming
-                const visibleText = assistantText.split('|||')[0]
                 setMessages(prev => prev.map(m =>
-                  m.id === assistantId ? { ...m, content: visibleText } : m
+                  m.id === assistantId ? { ...m, content: assistantText } : m
                 ))
               }
             } catch { /* chunk incompleto, ignorar */ }
@@ -106,15 +131,12 @@ export function useChat() {
 
       if (!assistantText) throw new Error('Empty response from API')
 
-      // Parse suggestions from ||| separator
-      const [mainText, suggestionsRaw] = assistantText.split('|||')
-      const suggestions = suggestionsRaw
-        ? suggestionsRaw.split('|').map(s => s.trim()).filter(Boolean).slice(0, 3)
-        : []
-
-      setMessages(prev => prev.map(m =>
-        m.id === assistantId ? { ...m, content: mainText.trim(), suggestions } : m
-      ))
+      // Fetch 3 short reply suggestions without blocking the main response
+      fetchSuggestions(assistantText, apiKey, IS_PROD, GROQ_API_URL).then(suggestions => {
+        setMessages(prev => prev.map(m =>
+          m.id === assistantId ? { ...m, suggestions } : m
+        ))
+      })
 
     } catch (err) {
       // Error handling
