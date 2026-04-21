@@ -10,14 +10,6 @@ export default function ChatInput({ onSend, loading, disabled, listening, onMicT
     textareaRef.current?.focus()
   }, [])
 
-  // Cuando llega transcripción de voz, la pone en el input y envía
-  useEffect(() => {
-    if (text && listening === false) {
-      // El texto fue puesto por voz (viene del hook useSpeech via onResult)
-      // No hacemos nada aquí, el envío lo gestiona App.jsx directamente
-    }
-  }, [text, listening])
-
   const handleSubmit = (e) => {
     e?.preventDefault()
     if (!text.trim() || loading || disabled) return

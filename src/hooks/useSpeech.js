@@ -19,6 +19,8 @@ export function useSpeech({ onResult, onSpeakEnd }) {
   const animFrameRef  = useRef(null)
   const maxTimerRef   = useRef(null)
   const pollRef       = useRef(null)
+  const keepAliveRef  = useRef(null)
+  const safetyRef     = useRef(null)
   const activeRef     = useRef(false)   // true while recording
   const onResultRef   = useRef(onResult)
   const onSpeakEndRef = useRef(onSpeakEnd)
@@ -39,8 +41,10 @@ export function useSpeech({ onResult, onSpeakEnd }) {
       activeRef.current = false
       cancelAnimationFrame(animFrameRef.current)
       clearTimeout(maxTimerRef.current)
-      streamRef.current?.getTracks().forEach(t => t.stop())
       clearInterval(pollRef.current)
+      clearInterval(keepAliveRef.current)
+      clearTimeout(safetyRef.current)
+      streamRef.current?.getTracks().forEach(t => t.stop())
       window.speechSynthesis?.cancel()
     }
   }, [])
@@ -88,15 +92,17 @@ export function useSpeech({ onResult, onSpeakEnd }) {
     chunksRef.current  = []
     activeRef.current  = true
 
-    // AudioContext for silence detection
-    const audioCtx = new AudioContext()
+    // AudioContext for silence detection (Safari needs the webkit-prefixed variant)
+    const AudioCtx = window.AudioContext || window.webkitAudioContext
+    const audioCtx = new AudioCtx()
     const source   = audioCtx.createMediaStreamSource(stream)
     const analyser = audioCtx.createAnalyser()
     analyser.fftSize = 256
     source.connect(analyser)
     const dataArr = new Uint8Array(analyser.frequencyBinCount)
 
-    // MediaRecorder
+    // MediaRecorder — emit chunks every second so audio is preserved if the tab
+    // is suspended or the recorder dies mid-session.
     const recorder = new MediaRecorder(stream)
     recorderRef.current = recorder
 
@@ -125,14 +131,15 @@ export function useSpeech({ onResult, onSpeakEnd }) {
         const text = data?.text?.trim()
         if (text) onResultRef.current(text)
         else setMicError('No speech detected. Try again.')
-      } catch {
-        setMicError('Transcription failed. Check your internet connection.')
+      } catch (err) {
+        if (err instanceof TypeError) setMicError('No internet connection. Check your network.')
+        else setMicError('Transcription failed. Try again.')
       } finally {
         setTranscribing(false)
       }
     }
 
-    recorder.start()
+    recorder.start(1000)
     setListening(true)
 
     // Silence detection (starts after 600ms to let user begin speaking)
@@ -164,11 +171,14 @@ export function useSpeech({ onResult, onSpeakEnd }) {
   }, [startListening, stopListening])
 
   // ── Text-to-speech ────────────────────────────────────────────────────────
+  // Mobile-safe: polling fallback + Android keep-alive + length-based safety.
   const speak = useCallback((text) => {
     if (!window.speechSynthesis) { onSpeakEndRef.current?.(); return }
 
     window.speechSynthesis.cancel()
     clearInterval(pollRef.current)
+    clearInterval(keepAliveRef.current)
+    clearTimeout(safetyRef.current)
 
     const u  = new SpeechSynthesisUtterance(text)
     u.lang   = 'en-US'
@@ -181,33 +191,55 @@ export function useSpeech({ onResult, onSpeakEnd }) {
       if (finished) return
       finished = true
       clearInterval(pollRef.current)
+      clearInterval(keepAliveRef.current)
+      clearTimeout(safetyRef.current)
       setSpeaking(false)
       onSpeakEndRef.current?.()
     }
 
-    u.onend = done; u.onerror = done
-    u.onstart = () => {
-      setSpeaking(true)
-      pollRef.current = setInterval(() => { if (!window.speechSynthesis.speaking) done() }, 300)
-    }
+    u.onend   = done
+    u.onerror = done
 
-    const safety    = setTimeout(() => { if (!finished) done() }, 1200)
-    const origStart = u.onstart
-    u.onstart       = (e) => { clearTimeout(safety); origStart(e) }
+    // Poll every 300ms — catches Android Chrome where onend never fires.
+    pollRef.current = setInterval(() => {
+      if (!window.speechSynthesis.speaking) done()
+    }, 300)
 
-    const doSpeak = () => {
+    // Android Chrome 15s bug — synthesis silently pauses. pause+resume keeps it alive.
+    keepAliveRef.current = setInterval(() => {
+      if (window.speechSynthesis.speaking) {
+        window.speechSynthesis.pause()
+        window.speechSynthesis.resume()
+      }
+    }, 10000)
+
+    // Hard safety based on text length (~100ms/char, min 3s, max 15s).
+    const safetyMs = Math.min(Math.max(text.length * 100, 3000), 15000)
+    safetyRef.current = setTimeout(done, safetyMs)
+
+    setSpeaking(true)
+
+    const applyVoice = () => {
       const v = window.speechSynthesis.getVoices()
       const voice = v.find(x => x.lang === 'en-US') || v.find(x => x.lang.startsWith('en'))
       if (voice) u.voice = voice
-      window.speechSynthesis.speak(u)
     }
 
-    if (window.speechSynthesis.getVoices().length > 0) doSpeak()
-    else window.speechSynthesis.addEventListener('voiceschanged', doSpeak, { once: true })
+    if (window.speechSynthesis.getVoices().length > 0) {
+      applyVoice()
+      window.speechSynthesis.speak(u)
+    } else {
+      window.speechSynthesis.addEventListener('voiceschanged', () => {
+        applyVoice()
+        window.speechSynthesis.speak(u)
+      }, { once: true })
+    }
   }, [])
 
   const stopSpeaking = useCallback(() => {
     clearInterval(pollRef.current)
+    clearInterval(keepAliveRef.current)
+    clearTimeout(safetyRef.current)
     window.speechSynthesis?.cancel()
     setSpeaking(false)
   }, [])

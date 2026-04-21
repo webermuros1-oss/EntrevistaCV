@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useVoiceConversation, STATES } from '../hooks/useVoiceConversation'
 import logo from '../public/img/logoParlare.png'
 
@@ -87,6 +88,19 @@ export default function VoiceUI() {
 
   const isActive = convState !== STATES.IDLE
 
+  // Space bar toggles the session (Discord-style). Ignored while typing in an input.
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.code !== 'Space' || e.repeat) return
+      const tag = e.target.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target.isContentEditable) return
+      e.preventDefault()
+      if (isActive) stop(); else start()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [isActive, start, stop])
+
   return (
     <div className="parlare-bg flex items-center justify-center p-4">
       <div className="w-full max-w-sm parlare-card rounded-3xl shadow-2xl overflow-hidden parlare-glow-purple">
@@ -102,7 +116,12 @@ export default function VoiceUI() {
 
         {/* Orb */}
         <VoiceOrb state={convState} />
-        <p className="text-center text-sm font-medium -mt-4 mb-4" style={{ color: 'rgba(180,160,220,0.75)' }}>
+        <p
+          className="text-center text-sm font-medium -mt-4 mb-4"
+          style={{ color: 'rgba(180,160,220,0.75)' }}
+          role="status"
+          aria-live="polite"
+        >
           {ORB_STYLES[convState]?.label ?? convState}
         </p>
 
@@ -162,7 +181,7 @@ export default function VoiceUI() {
             </button>
           )}
           <p className="text-xs text-center" style={{ color: 'rgba(160,140,210,0.45)' }}>
-            Speak naturally&nbsp;•&nbsp;Pause to send&nbsp;•&nbsp;Interrupt anytime
+            Speak naturally&nbsp;•&nbsp;Pause to send&nbsp;•&nbsp;Press <kbd className="px-1.5 py-0.5 rounded" style={{ background: 'rgba(123,47,255,0.15)', border: '1px solid rgba(123,47,255,0.3)' }}>Space</kbd> to toggle
           </p>
         </div>
       </div>

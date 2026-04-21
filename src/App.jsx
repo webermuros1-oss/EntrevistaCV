@@ -18,7 +18,7 @@ export default function App() {
   const [mode, setMode] = useState('voice')   // 'chat' | 'voice'
 
   const { messages, loading, error, sendMessage, clearChat } = useChat()
-  const { simplifyText, validateInput }                       = useBasicEnglish()
+  const { validateInput }                                     = useBasicEnglish()
   const [convoMode, setConvoMode] = useState(false)
   const messagesEndRef = useRef(null)
   const convoModeRef   = useRef(false)
@@ -29,8 +29,10 @@ export default function App() {
   const handleSend = useCallback((text) => {
     const { valid, error: msg } = validateInput(text)
     if (!valid) { alert(msg); return }
-    sendMessage(simplifyText(text))
-  }, [validateInput, simplifyText, sendMessage])
+    // Send exactly what the user wrote — no pre-processing. The LLM is the teacher;
+    // transforming vocabulary here would hide the user's real usage from it.
+    sendMessage(text)
+  }, [validateInput, sendMessage])
 
   const startListeningRef = useRef(null)
   const handleSpeakEndSafe = useCallback(() => {

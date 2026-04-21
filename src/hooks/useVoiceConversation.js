@@ -98,6 +98,10 @@ export function useVoiceConversation() {
       }
       if (e.error === 'network') {
         setError('Network error. Check your connection.')
+        activeRef.current    = false
+        listeningRef.current = false
+        setConvState(STATES.IDLE)
+        return
       }
     }
 
@@ -182,10 +186,12 @@ export function useVoiceConversation() {
     if (window.speechSynthesis.getVoices().length > 0) {
       window.speechSynthesis.speak(utter)
     } else {
-      window.speechSynthesis.addEventListener('voiceschanged', () => {
+      const onVoicesReady = () => {
+        if (!activeRef.current) return   // user stopped session before voices loaded
         applyVoice()
         window.speechSynthesis.speak(utter)
-      }, { once: true })
+      }
+      window.speechSynthesis.addEventListener('voiceschanged', onVoicesReady, { once: true })
     }
   }
 

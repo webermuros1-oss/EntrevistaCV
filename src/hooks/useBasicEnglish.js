@@ -1,42 +1,9 @@
-// Hook para preprocesar el input del usuario y mantenerlo simple
+// Input validation for chat messages.
+// Note: we don't pre-process the user's text — the LLM must see exactly what they
+// wrote so it can teach naturally (e.g. model simpler vocabulary in its reply).
 import { useCallback } from 'react'
 
-// Mapa de palabras complejas → equivalentes simples (A1-A2)
-const WORD_REPLACEMENTS = {
-  'utilize': 'use',
-  'commence': 'start',
-  'terminate': 'end',
-  'purchase': 'buy',
-  'require': 'need',
-  'obtain': 'get',
-  'demonstrate': 'show',
-  'endeavor': 'try',
-  'facilitate': 'help',
-  'subsequently': 'then',
-  'nevertheless': 'but',
-  'furthermore': 'also',
-  'approximately': 'about',
-  'sufficient': 'enough',
-  'comprehend': 'understand',
-  'communicate': 'talk',
-  'assistance': 'help',
-  'difficult': 'hard',
-  'excellent': 'great',
-  'wonderful': 'nice',
-}
-
 export function useBasicEnglish() {
-  // Simplifica el texto reemplazando palabras complejas
-  const simplifyText = useCallback((text) => {
-    let simplified = text
-    Object.entries(WORD_REPLACEMENTS).forEach(([complex, simple]) => {
-      const regex = new RegExp(`\\b${complex}\\b`, 'gi')
-      simplified = simplified.replace(regex, simple)
-    })
-    return simplified
-  }, [])
-
-  // Valida que el mensaje no esté vacío
   const validateInput = useCallback((text) => {
     const trimmed = text.trim()
     if (!trimmed) return { valid: false, error: 'Please write something!' }
@@ -44,5 +11,5 @@ export function useBasicEnglish() {
     return { valid: true, error: null }
   }, [])
 
-  return { simplifyText, validateInput }
+  return { validateInput }
 }

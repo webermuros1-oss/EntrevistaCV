@@ -10,6 +10,16 @@ const GROQ_API_URL = IS_PROD
   : 'https://api.groq.com/openai/v1/chat/completions'
 const MODEL = 'llama-3.1-8b-instant'
 
+const STORAGE_KEY      = 'parlare-chat-v1'
+const MAX_API_MESSAGES = 50
+const WELCOME          = "Hello! I am Sarah, your English teacher. How are you today?"
+
+// Collision-safe id generator (falls back for older browsers without crypto.randomUUID)
+const newId = () =>
+  (typeof crypto !== 'undefined' && crypto.randomUUID)
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`
+
 // Fetches 3 short reply suggestions after the main response — non-blocking
 async function fetchSuggestions(aiReply, apiKey, isProd, apiUrl) {
   try {
@@ -36,36 +46,57 @@ async function fetchSuggestions(aiReply, apiKey, isProd, apiUrl) {
     return []
   }
 }
-// Máximo de mensajes enviados a la API (el historial visible no se toca)
-const MAX_API_MESSAGES = 50
 
-const WELCOME = "Hello! I am Sarah, your English teacher. How are you today?"
+const buildWelcome = () => ({ role: 'assistant', content: WELCOME, id: newId() })
+
+// Load persisted chat on init — refresh no longer wipes the conversation.
+const loadInitialMessages = () => {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY)
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed
+    }
+  } catch { /* quota / private mode / corrupt — fall through */ }
+  return [buildWelcome()]
+}
 
 export function useChat() {
-  const welcomeMsg = { role: 'assistant', content: WELCOME, id: Date.now() }
-  const [messages, setMessages] = useState([welcomeMsg])
+  const [messages, setMessages] = useState(loadInitialMessages)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
-  // Ref para evitar stale closure: siempre lee el historial más reciente
+  // Refs: messagesRef avoids stale closures, sendingRef guards against rapid double-sends
+  // (setLoading is async — two clicks in the same tick can both pass a state-based guard).
   const messagesRef = useRef(messages)
+  const sendingRef  = useRef(false)
+
   useEffect(() => { messagesRef.current = messages }, [messages])
+
+  // Persist messages to localStorage whenever they change.
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(messages))
+    } catch { /* quota exceeded or private mode — ignore */ }
+  }, [messages])
 
   // Obtiene la API key desde variables de entorno de Vite
   const apiKey = import.meta.env.VITE_GROQ_API_KEY
 
   const sendMessage = useCallback(async (userText) => {
-    if (!userText.trim() || loading) return
+    if (!userText.trim() || sendingRef.current) return
+    sendingRef.current = true
 
     setError(null)
 
     // Lee el historial fresco desde el ref (evita stale closure)
-    const userMessage = { role: 'user', content: userText.trim(), id: Date.now() }
+    const userMessage = { role: 'user', content: userText.trim(), id: newId() }
     const updatedMessages = [...messagesRef.current, userMessage]
     setMessages(updatedMessages)
     setLoading(true)
 
-    let assistantId = null
+    const assistantId = newId()
+    let assistantCreated = false
 
     try {
       // Verifica que existe la API key (solo necesaria en local)
@@ -102,7 +133,7 @@ export function useChat() {
       }
 
       // Inserta mensaje vacío del asistente y lo rellena token a token
-      assistantId = Date.now() + 1
+      assistantCreated = true
       setMessages(prev => [...prev, { role: 'assistant', content: '', suggestions: [], id: assistantId }])
 
       const reader = response.body.getReader()
@@ -139,30 +170,34 @@ export function useChat() {
       })
 
     } catch (err) {
-      // Error handling
+      // Network errors from fetch surface as TypeError in every modern browser,
+      // regardless of OS language — much more reliable than matching message strings.
       let errorMsg = 'Something went wrong. Try again!'
 
       if (err.message === 'API_KEY_MISSING') {
         errorMsg = '🔑 Check your Groq API key in the .env file. Get it free at console.groq.com'
+      } else if (err instanceof TypeError) {
+        errorMsg = '🌐 No internet connection. Check your network.'
       } else if (err.message.includes('401') || err.message.includes('invalid_api_key')) {
         errorMsg = '🔑 Invalid API key. Check your .env file. Get a free key at console.groq.com'
       } else if (err.message.includes('429')) {
         errorMsg = '⏳ Too many messages! Wait a moment and try again.'
-      } else if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
-        errorMsg = '🌐 No internet connection. Check your network.'
       }
 
       setError(errorMsg)
       // Elimina el mensaje del usuario (y el del asistente vacío si se creó) para reintentar
-      setMessages(prev => prev.filter(m => m.id !== userMessage.id && m.id !== assistantId))
+      setMessages(prev => prev.filter(m =>
+        m.id !== userMessage.id && (!assistantCreated || m.id !== assistantId)
+      ))
     } finally {
       setLoading(false)
+      sendingRef.current = false
     }
-  }, [loading, apiKey])
+  }, [apiKey])
 
   // Limpia el chat y vuelve al mensaje de bienvenida
   const clearChat = useCallback(() => {
-    setMessages([{ role: 'assistant', content: WELCOME, id: Date.now() }])
+    setMessages([buildWelcome()])
     setError(null)
   }, [])
 
