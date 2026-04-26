@@ -230,7 +230,7 @@ export function useVoiceConversation(config) {
   // Fix: speak one sentence at a time. Each sentence gets its own safety
   // timeout; when it finishes (onend OR timeout) we move to the next one.
   // No global poll → no false triggers between sentences.
-  const speakText = useCallback((text) => {
+  const speakText = useCallback(async (text) => {
     window.speechSynthesis.cancel()
     clearTtsTimers()
     ttsDoneRef.current = false
@@ -244,75 +244,25 @@ export function useVoiceConversation(config) {
       return v.find(x => x.lang === 'es-ES') || v.find(x => x.lang.startsWith('es')) || null
     }
 
-    // Split into chunks of max ~120 chars so no chunk exceeds ~8 s of speech —
-    // well under the Android 15 s silent-kill limit. Splits at natural boundaries
-    // (sentence end > comma/semicolon > word space > hard cut).
-    const splitChunks = (input, maxLen = 120) => {
-      const out = []
-      let rem = input.trim()
-      while (rem.length > maxLen) {
-        let cut = -1
-        // 1. sentence boundary
-        for (let i = maxLen; i >= Math.floor(maxLen / 2); i--) {
-          if ('.!?'.includes(rem[i])) { cut = i + 1; break }
-        }
-        // 2. comma / semicolon
-        if (cut === -1) {
-          for (let i = maxLen; i >= Math.floor(maxLen / 2); i--) {
-            if (',;'.includes(rem[i])) { cut = i + 1; break }
-          }
-        }
-        // 3. word boundary
-        if (cut === -1) {
-          for (let i = maxLen; i >= Math.floor(maxLen / 2); i--) {
-            if (rem[i] === ' ') { cut = i; break }
-          }
-        }
-        // 4. hard cut
-        if (cut === -1) cut = maxLen
-        out.push(rem.slice(0, cut).trim())
-        rem = rem.slice(cut).trim()
-      }
-      if (rem) out.push(rem)
-      return out.filter(Boolean)
-    }
+    // Split at punctuation first, then subdivide any chunk still > 120 chars at
+    // word boundaries (~100 chars). Avoids long comma-separated runs hitting the
+    // Android 15 s TTS kill timer even without sentence-ending punctuation.
+    const splitChunks = (input) =>
+      input.trim()
+        .replace(/([.,!?;:])\s+/g, '$1|')
+        .split('|')
+        .map(s => s.trim())
+        .filter(Boolean)
+        .flatMap(s => {
+          if (s.length <= 120) return [s]
+          return s.match(/.{1,100}(\s|$)/g)?.map(x => x.trim()).filter(Boolean) || [s]
+        })
     const sentences = splitChunks(text)
 
-    let chunkIdx = 0
-
-    // Called when all sentences have been spoken (or on error/stop)
-    const onDone = () => {
-      if (ttsDoneRef.current) return
-      ttsDoneRef.current = true
-      clearTtsTimers()
-      if (!activeRef.current) return
-
-      // Hard-capped silence wait: max 2 s so we never hang if Android leaves
-      // speechSynthesis.speaking=true after cutting off audio.
-      let attempts = 0
-      const waitForSilence = () => {
-        if (!activeRef.current) return
-        attempts++
-        const ss = window.speechSynthesis
-        if (attempts > 20 || (!ss.speaking && !ss.pending)) {
-          if (attempts > 20) try { ss.cancel() } catch { /* ignore */ }
-          listeningRef.current = true
-          setConvState(STATES.LISTENING)
-          startRecognition()
-          return
-        }
-        trackedTimeout(waitForSilence, 100)
-      }
-      trackedTimeout(waitForSilence, 350)
-    }
-
-    // Speak next sentence in chain
-    const speakNext = () => {
-      if (ttsDoneRef.current || !activeRef.current) return
-      if (chunkIdx >= sentences.length) { onDone(); return }
-
-      const sentence = sentences[chunkIdx++]
-      const u = new SpeechSynthesisUtterance(sentence)
+    // Speak one chunk and resolve when done (onend / onerror / safety timeout).
+    // Promise-based so we can await each chunk — no gap, no global poll.
+    const speakChunk = (chunk) => new Promise(resolve => {
+      const u = new SpeechSynthesisUtterance(chunk)
       u.lang   = 'es-ES'
       u.rate   = 1.0
       u.pitch  = 1
@@ -320,40 +270,67 @@ export function useVoiceConversation(config) {
       const v = getVoice()
       if (v) u.voice = v
 
-      // Per-sentence guard: advance() fires exactly once per sentence
-      let advanced = false
-      const advance = () => {
-        if (advanced) return
-        advanced = true
-        clearTimeout(perSentenceSafety)
-        speakNext()
-      }
-
-      u.onend   = advance
-      u.onerror = advance  // skip errored sentence, continue chain
-
-      // Safety: if onend never fires (Android), move on after generous timeout
-      const perSentenceSafety = setTimeout(advance, Math.max(sentence.length * 160, 4000))
-
+      let done = false
+      const finish = () => { if (done) return; done = true; clearTimeout(safety); resolve() }
+      u.onend   = finish
+      u.onerror = finish  // skip bad chunk, continue queue
+      const safety = setTimeout(finish, Math.max(chunk.length * 160, 3500))
       window.speechSynthesis.speak(u)
-    }
-
-    // Overall safety for the whole sequence in case speakNext gets stuck
-    ttsSafety.current = setTimeout(onDone, Math.max(text.length * 130, 8000))
+    })
 
     listeningRef.current = false
     setConvState(STATES.SPEAKING)
 
-    const begin = () => {
-      if (activeRef.current) speakNext()
+    // Ensure voices are loaded before starting
+    if (window.speechSynthesis.getVoices().length === 0) {
+      await new Promise(r => {
+        window.speechSynthesis.addEventListener('voiceschanged', r, { once: true })
+        setTimeout(r, 1500)
+      })
     }
 
-    if (window.speechSynthesis.getVoices().length > 0) {
-      begin()
-    } else {
-      window.speechSynthesis.addEventListener('voiceschanged', begin, { once: true })
+    // Wake Lock: keep screen on so Android doesn't pause audio on dim
+    let wakeLock = null
+    try {
+      if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen')
+    } catch { /* not supported or denied — continue without it */ }
+
+    // Sequential queue: await each chunk before starting the next
+    for (const chunk of sentences) {
+      if (!activeRef.current) break
+      await speakChunk(chunk)
     }
-  }, [clearTtsTimers, trackedTimeout, startRecognition])
+
+    try { wakeLock?.release() } catch { /* ignore */ }
+
+    if (!activeRef.current) return
+
+    // Wait for synthesis truly idle — real-time deadline, no attempt counting
+    const deadline = Date.now() + 2000
+    while (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+      if (Date.now() > deadline) { try { window.speechSynthesis.cancel() } catch { /* ignore */ }; break }
+      await new Promise(r => setTimeout(r, 100))
+    }
+
+    if (!activeRef.current) return
+    await new Promise(r => setTimeout(r, 350))  // OS audio stack breathing room
+    if (!activeRef.current) return
+
+    ttsDoneRef.current = true
+    listeningRef.current = true
+    setConvState(STATES.LISTENING)
+    startRecognition()
+
+    // Hard fallback: if mic still not open after 2.5 s, force it
+    setTimeout(() => {
+      if (activeRef.current && !listeningRef.current) {
+        try { window.speechSynthesis.cancel() } catch { /* ignore */ }
+        listeningRef.current = true
+        setConvState(STATES.LISTENING)
+        startRecognition()
+      }
+    }, 2500)
+  }, [clearTtsTimers, startRecognition])
 
   // ── Process one user turn ─────────────────────────────────────────────────
   const processUserTurn = useCallback(async (text) => {
