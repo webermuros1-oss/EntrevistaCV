@@ -50,3 +50,4 @@ src/
 - Indicador de "escribiendo..."
 - Limpiar chat con un clic
 - Mobile-first responsive
+# AppCVReact
