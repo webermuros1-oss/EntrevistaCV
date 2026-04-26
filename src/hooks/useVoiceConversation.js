@@ -223,25 +223,31 @@ export function useVoiceConversation(config) {
     }
   }, [trackedTimeout])
 
-  // ── TTS with mobile-safe teardown ─────────────────────────────────────────
+  // ── TTS — sentence-split to beat the Android 15 s cutoff bug ───────────────
+  // Android Chrome silently kills utterances longer than ~15 s.
+  // Fix: split the text into individual sentences and queue them separately.
+  // Each sentence is short enough to finish before the OS cuts it off.
+  // waitForSilence has a hard 2 s fallback so it never hangs if Android leaves
+  // speechSynthesis.speaking stuck on true after cutting off.
   const speakText = useCallback((text) => {
     window.speechSynthesis.cancel()
     clearTtsTimers()
     ttsDoneRef.current = false
 
-    const utter  = new SpeechSynthesisUtterance(text)
-    utter.lang   = 'es-ES'
-    utter.rate   = 1.0
-    utter.pitch  = 1
-    utter.volume = 1
+    // Reset accumulation buffer — next user turn starts fresh
+    clearTimeout(sendTimerRef.current)
+    pendingTranscriptRef.current = null
 
-    const applyVoice = () => {
+    const getVoice = () => {
       const voices = window.speechSynthesis.getVoices()
-      const voice  = voices.find(v => v.lang === 'es-ES') ||
-                     voices.find(v => v.lang.startsWith('es'))
-      if (voice) utter.voice = voice
+      return voices.find(v => v.lang === 'es-ES') ||
+             voices.find(v => v.lang.startsWith('es')) ||
+             null
     }
-    applyVoice()
+
+    // Split on sentence-ending punctuation, keeping the punctuation attached
+    const sentences = text.match(/[^.!?¿¡]+[.!?]*/g)
+      ?.map(s => s.trim()).filter(Boolean) ?? [text]
 
     const onDone = () => {
       if (ttsDoneRef.current) return
@@ -249,58 +255,65 @@ export function useVoiceConversation(config) {
       clearTtsTimers()
       if (!activeRef.current) return
 
-      // Poll until speechSynthesis is truly idle before opening the mic.
-      // A fixed timeout isn't enough — on Android the engine can linger.
+      // Wait for synthesis to go truly idle before opening the mic.
+      // Hard cap of 20 iterations (2 s) in case Android leaves speaking=true.
+      let attempts = 0
       const waitForSilence = () => {
         if (!activeRef.current) return
         const ss = window.speechSynthesis
-        if (ss && (ss.speaking || ss.pending)) {
-          trackedTimeout(waitForSilence, 100)
+        attempts++
+        if (attempts > 20 || !ss || (!ss.speaking && !ss.pending)) {
+          if (attempts > 20) try { window.speechSynthesis.cancel() } catch { /* ignore */ }
+          listeningRef.current = true
+          setConvState(STATES.LISTENING)
+          startRecognition()
           return
         }
-        listeningRef.current = true
-        setConvState(STATES.LISTENING)
-        startRecognition()
+        trackedTimeout(waitForSilence, 100)
       }
-      // Initial breathing room so the OS audio stack releases the speaker
-      trackedTimeout(waitForSilence, 380)
+      trackedTimeout(waitForSilence, 350)
     }
 
-    utter.onend   = onDone
-    utter.onerror = onDone
+    // Build one utterance per sentence
+    const utters = sentences.map((sentence, i) => {
+      const u = new SpeechSynthesisUtterance(sentence)
+      u.lang   = 'es-ES'
+      u.rate   = 1.0
+      u.pitch  = 1
+      u.volume = 1
+      const v = getVoice()
+      if (v) u.voice = v
+      // Only the last sentence triggers onDone; any error in any sentence ends early
+      if (i === sentences.length - 1) u.onend = onDone
+      u.onerror = onDone
+      return u
+    })
 
-    // Fallback poll — Android Chrome where onend never fires
+    // Fallback poll — catches Android where onend of the last utterance never fires
     ttsPollRef.current = setInterval(() => {
       if (!window.speechSynthesis.speaking && !window.speechSynthesis.pending) onDone()
-    }, 250)
+    }, 300)
 
-    // Android 15s pause bug workaround
-    ttsKeepAlive.current = setInterval(() => {
-      if (window.speechSynthesis.speaking) {
-        window.speechSynthesis.pause()
-        window.speechSynthesis.resume()
-      }
-    }, 10000)
-
-    // Hard safety cap (~90ms/char, min 3s, max 35s)
-    const safetyMs = Math.min(Math.max(text.length * 90, 3000), 35000)
+    // Overall safety timeout based on full text length (no hard cap)
+    const safetyMs = Math.max(text.length * 95, 5000)
     ttsSafety.current = setTimeout(onDone, safetyMs)
-
-    // Reset accumulation buffer — next user turn starts fresh
-    clearTimeout(sendTimerRef.current)
-    pendingTranscriptRef.current = null
 
     listeningRef.current = false
     setConvState(STATES.SPEAKING)
 
+    const enqueue = () => {
+      for (const u of utters) window.speechSynthesis.speak(u)
+    }
+
     if (window.speechSynthesis.getVoices().length > 0) {
-      window.speechSynthesis.speak(utter)
+      enqueue()
     } else {
-      // Voices not loaded yet (common on first load, especially mobile)
       window.speechSynthesis.addEventListener('voiceschanged', () => {
         if (!activeRef.current) return
-        applyVoice()
-        window.speechSynthesis.speak(utter)
+        // Re-apply voice now that voices are loaded
+        const v = getVoice()
+        if (v) utters.forEach(u => { u.voice = v })
+        enqueue()
       }, { once: true })
     }
   }, [clearTtsTimers, trackedTimeout, startRecognition])
