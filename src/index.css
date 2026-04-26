@@ -7,137 +7,130 @@
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: #0F0F1A;
+  background: #080F1C;
 }
 
-/* ── Parlare Design System ─────────────────────────────────── */
+/* ── EntrevistaCV Design System ───────────────────────────────────────────
+   Paleta extraída del logo:
+     Blue brand  #1A73E8   Dark navy bg  #080F1C
+     Orange "CV" #FF6D00   Card bg       #0D1E33
+     Blue dark   #0D47A1   Border        rgba(26,115,232,0.25)
+──────────────────────────────────────────────────────────────────────── */
 
-.parlare-bg {
-  background: linear-gradient(160deg, #0F0F1A 0%, #1A1A2E 50%, #161625 100%);
+.cv-bg {
+  background: linear-gradient(160deg, #080F1C 0%, #0B1929 50%, #091525 100%);
   min-height: 100vh;
 }
 
-.parlare-header {
-  background: linear-gradient(135deg, #0F0F1A 0%, #1A1428 100%);
-  border-bottom: 1px solid rgba(123, 47, 255, 0.25);
+.cv-header {
+  background: linear-gradient(135deg, #080F1C 0%, #0D1829 100%);
+  border-bottom: 1px solid rgba(26, 115, 232, 0.25);
 }
 
-.parlare-topbar {
-  background: rgba(15, 15, 26, 0.92);
-  border-bottom: 1px solid rgba(123, 47, 255, 0.2);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+.cv-card {
+  background: linear-gradient(160deg, #0D1E33 0%, #112540 100%);
+  border: 1px solid rgba(26, 115, 232, 0.22);
 }
 
-.parlare-card {
-  background: linear-gradient(160deg, #1C1C30 0%, #20203A 100%);
-  border: 1px solid rgba(123, 47, 255, 0.2);
-}
+/* ── Buttons ───────────────────────────────────────────────────────────── */
 
-/* ── Buttons ─────────────────────────────────────────────────  */
-
-.parlare-btn-primary {
-  background: linear-gradient(135deg, #FF6B00 0%, #7B2FFF 100%);
+.cv-btn-primary {
+  background: linear-gradient(135deg, #FF6D00 0%, #1A73E8 100%);
   color: white;
   transition: all 0.2s;
 }
-.parlare-btn-primary:hover {
-  background: linear-gradient(135deg, #FF8C42 0%, #9B5FFF 100%);
-  box-shadow: 0 4px 24px rgba(255, 107, 0, 0.4);
+.cv-btn-primary:hover {
+  background: linear-gradient(135deg, #FF8C42 0%, #4D9EFF 100%);
+  box-shadow: 0 4px 24px rgba(26, 115, 232, 0.45);
 }
-.parlare-btn-primary:active {
+.cv-btn-primary:active {
   transform: scale(0.97);
 }
+.cv-btn-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
 
-.parlare-btn-stop {
-  background: linear-gradient(135deg, #FF2D9B 0%, #FF4444 100%);
+.cv-btn-stop {
+  background: linear-gradient(135deg, #C62828 0%, #E53935 100%);
   color: white;
   transition: all 0.2s;
 }
-.parlare-btn-stop:hover {
-  box-shadow: 0 4px 24px rgba(255, 45, 155, 0.4);
+.cv-btn-stop:hover {
+  box-shadow: 0 4px 24px rgba(229, 57, 53, 0.4);
 }
-.parlare-btn-stop:active {
+.cv-btn-stop:active {
   transform: scale(0.97);
 }
 
-/* ── Text & gradients ────────────────────────────────────────  */
+/* ── Text & gradients ─────────────────────────────────────────────────── */
 
-.parlare-text-gradient {
-  background: linear-gradient(135deg, #FF6B00, #FF2D9B);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.parlare-title-gradient {
-  background: linear-gradient(135deg, #FF6B00 0%, #FF8C42 50%, #FF2D9B 100%);
+/* Orange → Blue: matches "Entrevista" (dark) + "CV" (orange) in the logo */
+.cv-title-gradient {
+  background: linear-gradient(135deg, #FF6D00 0%, #FF8C42 40%, #1A73E8 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
   font-weight: 800;
 }
 
-/* ── Glows ───────────────────────────────────────────────────  */
-
-.parlare-glow-orange {
-  box-shadow: 0 0 30px rgba(255, 107, 0, 0.4), 0 0 60px rgba(255, 107, 0, 0.12);
-}
-.parlare-glow-purple {
-  box-shadow: 0 0 30px rgba(123, 47, 255, 0.4), 0 0 60px rgba(123, 47, 255, 0.12);
-}
-.parlare-glow-cyan {
-  box-shadow: 0 0 30px rgba(0, 212, 255, 0.4), 0 0 60px rgba(0, 212, 255, 0.12);
-}
-.parlare-glow-magenta {
-  box-shadow: 0 0 30px rgba(255, 45, 155, 0.4), 0 0 60px rgba(255, 45, 155, 0.12);
+/* Orange accent for "Tú:" labels etc. */
+.cv-text-gradient {
+  background: linear-gradient(135deg, #FF6D00, #FF8C42);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
-/* ── Input ───────────────────────────────────────────────────  */
+/* ── Glows ────────────────────────────────────────────────────────────── */
 
-.parlare-input {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(123, 47, 255, 0.35);
-  color: #e0e0f0;
+.cv-glow-blue {
+  box-shadow: 0 0 30px rgba(26, 115, 232, 0.4), 0 0 60px rgba(26, 115, 232, 0.12);
+}
+.cv-glow-orange {
+  box-shadow: 0 0 30px rgba(255, 109, 0, 0.4), 0 0 60px rgba(255, 109, 0, 0.12);
+}
+
+/* ── Input ────────────────────────────────────────────────────────────── */
+
+.cv-input {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(26, 115, 232, 0.35);
+  color: #e8f0fe;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
-.parlare-input::placeholder {
-  color: rgba(160, 150, 200, 0.45);
+.cv-input::placeholder {
+  color: rgba(100, 160, 220, 0.45);
 }
-.parlare-input:focus {
-  border-color: rgba(255, 107, 0, 0.7);
-  box-shadow: 0 0 0 2px rgba(255, 107, 0, 0.15);
+.cv-input:focus {
+  border-color: rgba(255, 109, 0, 0.7);
+  box-shadow: 0 0 0 2px rgba(255, 109, 0, 0.15);
   outline: none;
 }
-.parlare-input:disabled {
+.cv-input:disabled {
   opacity: 0.45;
 }
-.parlare-input-listening {
-  border-color: rgba(255, 45, 155, 0.6) !important;
-  background: rgba(255, 45, 155, 0.07) !important;
-}
 
-/* ── Orb animations ──────────────────────────────────────────  */
+/* ── Orb animations ───────────────────────────────────────────────────── */
 
 @keyframes orbPulseOrange {
-  0%, 100% { box-shadow: 0 0 20px rgba(255, 107, 0, 0.5), 0 0 50px rgba(255, 107, 0, 0.2); }
-  50%       { box-shadow: 0 0 45px rgba(255, 107, 0, 0.8), 0 0 90px rgba(255, 107, 0, 0.35); }
+  0%, 100% { box-shadow: 0 0 20px rgba(255, 109, 0, 0.5), 0 0 50px rgba(255, 109, 0, 0.2); }
+  50%       { box-shadow: 0 0 45px rgba(255, 109, 0, 0.8), 0 0 90px rgba(255, 109, 0, 0.35); }
 }
-@keyframes orbPulsePurple {
-  0%, 100% { box-shadow: 0 0 20px rgba(123, 47, 255, 0.5), 0 0 50px rgba(123, 47, 255, 0.2); }
-  50%       { box-shadow: 0 0 45px rgba(123, 47, 255, 0.8), 0 0 90px rgba(123, 47, 255, 0.35); }
+@keyframes orbPulseBlue {
+  0%, 100% { box-shadow: 0 0 20px rgba(26, 115, 232, 0.5), 0 0 50px rgba(26, 115, 232, 0.2); }
+  50%       { box-shadow: 0 0 45px rgba(26, 115, 232, 0.8), 0 0 90px rgba(26, 115, 232, 0.35); }
 }
 @keyframes orbPulseCyan {
-  0%, 100% { box-shadow: 0 0 20px rgba(0, 212, 255, 0.5), 0 0 50px rgba(0, 212, 255, 0.2); }
-  50%       { box-shadow: 0 0 45px rgba(0, 212, 255, 0.8), 0 0 90px rgba(0, 212, 255, 0.35); }
+  0%, 100% { box-shadow: 0 0 20px rgba(79, 195, 247, 0.5), 0 0 50px rgba(79, 195, 247, 0.2); }
+  50%       { box-shadow: 0 0 45px rgba(79, 195, 247, 0.8), 0 0 90px rgba(79, 195, 247, 0.35); }
 }
 
 .orb-listening  { animation: orbPulseOrange 0.9s ease-in-out infinite; }
-.orb-speaking   { animation: orbPulsePurple 1.2s ease-in-out infinite; }
-.orb-connecting { animation: orbPulseCyan   1.5s ease-in-out infinite; }
-.orb-processing { animation: orbPulseOrange 1.1s ease-in-out infinite; }
+.orb-speaking   { animation: orbPulseBlue   1.2s ease-in-out infinite; }
+.orb-processing { animation: orbPulseCyan   1.1s ease-in-out infinite; }
 
-/* ── Spinner & scroll ────────────────────────────────────────  */
+/* ── Spinner ──────────────────────────────────────────────────────────── */
 
 @keyframes spin {
   to { transform: rotate(360deg); }
@@ -146,11 +139,7 @@ body {
   animation: spin 1s linear infinite;
 }
 
-.chat-scroll {
-  scroll-behavior: smooth;
-}
-
-/* ── Message appear ──────────────────────────────────────────  */
+/* ── Message appear ───────────────────────────────────────────────────── */
 
 @keyframes fadeInUp {
   from { opacity: 0; transform: translateY(8px); }
