@@ -244,9 +244,39 @@ export function useVoiceConversation(config) {
       return v.find(x => x.lang === 'es-ES') || v.find(x => x.lang.startsWith('es')) || null
     }
 
-    // Split on sentence-ending punctuation; fall back to whole text if no splits
-    const sentences = text.match(/[^.!?¿¡]+[.!?]*/g)
-      ?.map(s => s.trim()).filter(Boolean) ?? [text]
+    // Split into chunks of max ~120 chars so no chunk exceeds ~8 s of speech —
+    // well under the Android 15 s silent-kill limit. Splits at natural boundaries
+    // (sentence end > comma/semicolon > word space > hard cut).
+    const splitChunks = (input, maxLen = 120) => {
+      const out = []
+      let rem = input.trim()
+      while (rem.length > maxLen) {
+        let cut = -1
+        // 1. sentence boundary
+        for (let i = maxLen; i >= Math.floor(maxLen / 2); i--) {
+          if ('.!?'.includes(rem[i])) { cut = i + 1; break }
+        }
+        // 2. comma / semicolon
+        if (cut === -1) {
+          for (let i = maxLen; i >= Math.floor(maxLen / 2); i--) {
+            if (',;'.includes(rem[i])) { cut = i + 1; break }
+          }
+        }
+        // 3. word boundary
+        if (cut === -1) {
+          for (let i = maxLen; i >= Math.floor(maxLen / 2); i--) {
+            if (rem[i] === ' ') { cut = i; break }
+          }
+        }
+        // 4. hard cut
+        if (cut === -1) cut = maxLen
+        out.push(rem.slice(0, cut).trim())
+        rem = rem.slice(cut).trim()
+      }
+      if (rem) out.push(rem)
+      return out.filter(Boolean)
+    }
+    const sentences = splitChunks(text)
 
     let chunkIdx = 0
 
