@@ -223,12 +223,13 @@ export function useVoiceConversation(config) {
     }
   }, [trackedTimeout])
 
-  // ── TTS — sentence-split to beat the Android 15 s cutoff bug ───────────────
-  // Android Chrome silently kills utterances longer than ~15 s.
-  // Fix: split the text into individual sentences and queue them separately.
-  // Each sentence is short enough to finish before the OS cuts it off.
-  // waitForSilence has a hard 2 s fallback so it never hangs if Android leaves
-  // speechSynthesis.speaking stuck on true after cutting off.
+  // ── TTS — sequential sentence-by-sentence, no global poll ──────────────────
+  // Root cause of the Android cutoff: a global setInterval checking
+  // speechSynthesis.speaking fires in the gap between two queued utterances
+  // (speaking=false for ~1 frame) and calls onDone prematurely.
+  // Fix: speak one sentence at a time. Each sentence gets its own safety
+  // timeout; when it finishes (onend OR timeout) we move to the next one.
+  // No global poll → no false triggers between sentences.
   const speakText = useCallback((text) => {
     window.speechSynthesis.cancel()
     clearTtsTimers()
@@ -239,31 +240,32 @@ export function useVoiceConversation(config) {
     pendingTranscriptRef.current = null
 
     const getVoice = () => {
-      const voices = window.speechSynthesis.getVoices()
-      return voices.find(v => v.lang === 'es-ES') ||
-             voices.find(v => v.lang.startsWith('es')) ||
-             null
+      const v = window.speechSynthesis.getVoices()
+      return v.find(x => x.lang === 'es-ES') || v.find(x => x.lang.startsWith('es')) || null
     }
 
-    // Split on sentence-ending punctuation, keeping the punctuation attached
+    // Split on sentence-ending punctuation; fall back to whole text if no splits
     const sentences = text.match(/[^.!?¿¡]+[.!?]*/g)
       ?.map(s => s.trim()).filter(Boolean) ?? [text]
 
+    let chunkIdx = 0
+
+    // Called when all sentences have been spoken (or on error/stop)
     const onDone = () => {
       if (ttsDoneRef.current) return
       ttsDoneRef.current = true
       clearTtsTimers()
       if (!activeRef.current) return
 
-      // Wait for synthesis to go truly idle before opening the mic.
-      // Hard cap of 20 iterations (2 s) in case Android leaves speaking=true.
+      // Hard-capped silence wait: max 2 s so we never hang if Android leaves
+      // speechSynthesis.speaking=true after cutting off audio.
       let attempts = 0
       const waitForSilence = () => {
         if (!activeRef.current) return
-        const ss = window.speechSynthesis
         attempts++
-        if (attempts > 20 || !ss || (!ss.speaking && !ss.pending)) {
-          if (attempts > 20) try { window.speechSynthesis.cancel() } catch { /* ignore */ }
+        const ss = window.speechSynthesis
+        if (attempts > 20 || (!ss.speaking && !ss.pending)) {
+          if (attempts > 20) try { ss.cancel() } catch { /* ignore */ }
           listeningRef.current = true
           setConvState(STATES.LISTENING)
           startRecognition()
@@ -274,8 +276,12 @@ export function useVoiceConversation(config) {
       trackedTimeout(waitForSilence, 350)
     }
 
-    // Build one utterance per sentence
-    const utters = sentences.map((sentence, i) => {
+    // Speak next sentence in chain
+    const speakNext = () => {
+      if (ttsDoneRef.current || !activeRef.current) return
+      if (chunkIdx >= sentences.length) { onDone(); return }
+
+      const sentence = sentences[chunkIdx++]
       const u = new SpeechSynthesisUtterance(sentence)
       u.lang   = 'es-ES'
       u.rate   = 1.0
@@ -283,38 +289,39 @@ export function useVoiceConversation(config) {
       u.volume = 1
       const v = getVoice()
       if (v) u.voice = v
-      // Only the last sentence triggers onDone; any error in any sentence ends early
-      if (i === sentences.length - 1) u.onend = onDone
-      u.onerror = onDone
-      return u
-    })
 
-    // Fallback poll — catches Android where onend of the last utterance never fires
-    ttsPollRef.current = setInterval(() => {
-      if (!window.speechSynthesis.speaking && !window.speechSynthesis.pending) onDone()
-    }, 300)
+      // Per-sentence guard: advance() fires exactly once per sentence
+      let advanced = false
+      const advance = () => {
+        if (advanced) return
+        advanced = true
+        clearTimeout(perSentenceSafety)
+        speakNext()
+      }
 
-    // Overall safety timeout based on full text length (no hard cap)
-    const safetyMs = Math.max(text.length * 95, 5000)
-    ttsSafety.current = setTimeout(onDone, safetyMs)
+      u.onend   = advance
+      u.onerror = advance  // skip errored sentence, continue chain
+
+      // Safety: if onend never fires (Android), move on after generous timeout
+      const perSentenceSafety = setTimeout(advance, Math.max(sentence.length * 160, 4000))
+
+      window.speechSynthesis.speak(u)
+    }
+
+    // Overall safety for the whole sequence in case speakNext gets stuck
+    ttsSafety.current = setTimeout(onDone, Math.max(text.length * 130, 8000))
 
     listeningRef.current = false
     setConvState(STATES.SPEAKING)
 
-    const enqueue = () => {
-      for (const u of utters) window.speechSynthesis.speak(u)
+    const begin = () => {
+      if (activeRef.current) speakNext()
     }
 
     if (window.speechSynthesis.getVoices().length > 0) {
-      enqueue()
+      begin()
     } else {
-      window.speechSynthesis.addEventListener('voiceschanged', () => {
-        if (!activeRef.current) return
-        // Re-apply voice now that voices are loaded
-        const v = getVoice()
-        if (v) utters.forEach(u => { u.voice = v })
-        enqueue()
-      }, { once: true })
+      window.speechSynthesis.addEventListener('voiceschanged', begin, { once: true })
     }
   }, [clearTtsTimers, trackedTimeout, startRecognition])
 
