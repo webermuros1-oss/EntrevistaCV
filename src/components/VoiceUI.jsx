@@ -119,11 +119,11 @@ export default function VoiceUI({ config, onChangeSetup }) {
           </div>
           <button
             onClick={handleChangeSetup}
-            title="Cambiar entrevista"
-            className="flex-shrink-0 text-xs px-3 py-1.5 rounded-full transition-colors hover:bg-blue-50"
-            style={{ color: '#64748B', border: '1px solid rgba(26,115,232,0.22)' }}
+            title="Volver a la configuración"
+            className="flex-shrink-0 text-xs px-3 py-1.5 rounded-full transition-colors hover:bg-blue-50 font-medium"
+            style={{ color: '#1A73E8', border: '1px solid rgba(26,115,232,0.3)' }}
           >
-            ⚙️
+            ← Cambiar
           </button>
         </div>
 

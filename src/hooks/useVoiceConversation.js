@@ -240,8 +240,18 @@ export function useVoiceConversation(config) {
     pendingTranscriptRef.current = null
 
     const getVoice = () => {
-      const v = window.speechSynthesis.getVoices()
-      return v.find(x => x.lang === 'es-ES') || v.find(x => x.lang.startsWith('es')) || null
+      const all = window.speechSynthesis.getVoices()
+      const es  = all.filter(v => v.lang === 'es-ES' || v.lang.startsWith('es'))
+      if (!es.length) return null
+      // Prioritize female-sounding voice names across platforms
+      // (Windows: Helena/Laura, macOS/iOS: Monica/Siri, Android: Google español)
+      const femaleKeys = ['helena', 'laura', 'mónica', 'monica', 'siri', 'google español', 'google es', 'paulina', 'conchita', 'sofía', 'sofia']
+      const female = es.find(v => femaleKeys.some(k => v.name.toLowerCase().includes(k)))
+      if (female) return female
+      // Avoid known male voices (Pablo, Jorge, Carlos…) when alternatives exist
+      const maleKeys = ['pablo', 'jorge', 'carlos', 'diego', 'miguel']
+      const notMale = es.filter(v => !maleKeys.some(k => v.name.toLowerCase().includes(k)))
+      return (notMale.find(v => v.lang === 'es-ES') ?? es.find(v => v.lang === 'es-ES') ?? es[0])
     }
 
     // Split at punctuation first, then subdivide any chunk still > 120 chars at

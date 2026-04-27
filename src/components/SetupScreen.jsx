@@ -2,20 +2,32 @@ import { useState } from 'react'
 import logo from '../public/img/logoCV.png'
 import { SECTORS, LEVELS, ROLE_SUGGESTIONS } from '../config/interviewer'
 
-export default function SetupScreen({ onStart }) {
-  const [role,   setRole]   = useState('')
-  const [sector, setSector] = useState('tech')
-  const [level,  setLevel]  = useState('media')
+const GENDERS = [
+  { id: 'mujer',   label: 'Mujer' },
+  { id: 'hombre',  label: 'Hombre' },
+  { id: 'neutro',  label: 'Prefiero no indicar' },
+]
+
+export default function SetupScreen({ onStart, initialConfig }) {
+  const [name,   setName]   = useState(initialConfig?.name   ?? '')
+  const [gender, setGender] = useState(initialConfig?.gender ?? 'neutro')
+  const [role,   setRole]   = useState(initialConfig?.role   ?? '')
+  const [sector, setSector] = useState(initialConfig?.sector ?? 'tech')
+  const [level,  setLevel]  = useState(initialConfig?.level  ?? 'media')
 
   const canStart = role.trim().length >= 2
 
   const handleSubmit = (e) => {
     e?.preventDefault()
     if (!canStart) return
-    onStart({ role: role.trim(), sector, level })
+    onStart({ role: role.trim(), sector, level, name: name.trim(), gender })
   }
 
   const suggestions = ROLE_SUGGESTIONS[sector] ?? []
+
+  const pillStyle = (active) => active
+    ? { background: 'linear-gradient(135deg,#FF6D00,#1A73E8)', color: 'white', boxShadow: '0 2px 12px rgba(26,115,232,0.28)' }
+    : { background: '#EFF6FF', border: '1px solid #BFDBFE', color: '#1A73E8' }
 
   return (
     <div className="cv-bg min-h-screen flex flex-col items-center justify-center p-4">
@@ -41,6 +53,38 @@ export default function SetupScreen({ onStart }) {
 
         <div className="px-5 py-5 space-y-5">
 
+          {/* Datos personales */}
+          <div className="space-y-3">
+            <label className="block text-xs font-semibold" style={{ color: '#1A73E8' }}>
+              Tu nombre <span style={{ color: '#94A3B8', fontWeight: 400 }}>(opcional)</span>
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              placeholder="Ej: María, Carlos…"
+              className="w-full rounded-2xl px-4 py-3 text-sm cv-input"
+              autoComplete="given-name"
+            />
+
+            <label className="block text-xs font-semibold mt-1" style={{ color: '#1A73E8' }}>
+              Cómo quieres que te traten
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {GENDERS.map(g => (
+                <button
+                  key={g.id}
+                  type="button"
+                  onClick={() => setGender(g.id)}
+                  className="text-xs rounded-xl px-2 py-2.5 font-medium transition-all"
+                  style={pillStyle(gender === g.id)}
+                >
+                  {g.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Sector */}
           <div>
             <label className="block text-xs font-semibold mb-2" style={{ color: '#1A73E8' }}>
@@ -53,10 +97,7 @@ export default function SetupScreen({ onStart }) {
                   type="button"
                   onClick={() => { setSector(s.id); setRole('') }}
                   className="text-xs rounded-xl px-2 py-2.5 font-medium transition-all"
-                  style={sector === s.id
-                    ? { background: 'linear-gradient(135deg,#FF6D00,#1A73E8)', color: 'white', boxShadow: '0 2px 12px rgba(26,115,232,0.3)' }
-                    : { background: '#EFF6FF', border: '1px solid #BFDBFE', color: '#1A73E8' }
-                  }
+                  style={pillStyle(sector === s.id)}
                 >
                   {s.label}
                 </button>
@@ -86,10 +127,7 @@ export default function SetupScreen({ onStart }) {
                     type="button"
                     onClick={() => setRole(s)}
                     className="text-xs rounded-full px-3 py-1 transition-all active:scale-95"
-                    style={role === s
-                      ? { background: 'linear-gradient(135deg,#FF6D00,#1A73E8)', color: 'white' }
-                      : { background: '#EFF6FF', border: '1px solid #BFDBFE', color: '#1A73E8' }
-                    }
+                    style={pillStyle(role === s)}
                   >
                     {s}
                   </button>
@@ -98,25 +136,22 @@ export default function SetupScreen({ onStart }) {
             )}
           </div>
 
-          {/* Dificultad */}
+          {/* Nivel */}
           <div>
             <label className="block text-xs font-semibold mb-2" style={{ color: '#1A73E8' }}>
-              Dificultad
+              Nivel
             </label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               {LEVELS.map(l => (
                 <button
                   key={l.id}
                   type="button"
                   onClick={() => setLevel(l.id)}
                   className="text-xs rounded-xl px-3 py-3 font-medium transition-all flex flex-col items-center gap-0.5"
-                  style={level === l.id
-                    ? { background: 'linear-gradient(135deg,#FF6D00,#1A73E8)', color: 'white', boxShadow: '0 2px 12px rgba(26,115,232,0.3)' }
-                    : { background: '#EFF6FF', border: '1px solid #BFDBFE', color: '#1A73E8' }
-                  }
+                  style={pillStyle(level === l.id)}
                 >
                   <span className="font-bold">{l.label}</span>
-                  <span style={{ fontSize: '10px', opacity: 0.8, lineHeight: 1.2, textAlign: 'center' }}>{l.hint}</span>
+                  <span style={{ fontSize: '10px', opacity: 0.85, lineHeight: 1.3, textAlign: 'center' }}>{l.hint}</span>
                 </button>
               ))}
             </div>

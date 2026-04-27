@@ -8,9 +8,10 @@ export const SECTORS = [
 ]
 
 export const LEVELS = [
-  { id: 'junior', label: 'Junior',  hint: 'Sin experiencia o 1-2 años' },
-  { id: 'media',  label: 'Media',   hint: '2-5 años de experiencia' },
-  { id: 'senior', label: 'Senior',  hint: '+5 años · liderazgo' },
+  { id: 'sin_exp', label: 'Sin exp.',  hint: 'Primera búsqueda de empleo' },
+  { id: 'junior',  label: 'Junior',    hint: '1-2 años de experiencia' },
+  { id: 'media',   label: 'Medio',     hint: '2-5 años de experiencia' },
+  { id: 'senior',  label: 'Senior',    hint: '+5 años · liderazgo' },
 ]
 
 export const ROLE_SUGGESTIONS = {
@@ -37,20 +38,31 @@ const SECTOR_GUIDE = {
   admin:
     'Para administración: pregunta por software utilizado (Excel avanzado, SAP, ERP), procesos optimizados, atención al detalle, gestión documental, coordinación interdepartamental.',
   otro:
-    'Adapta las preguntas al puesto y sector descritos. Busca ejemplos concretos y decisiones tomadas.',
+    'IMPORTANTE: el candidato ha seleccionado "Otro" como sector. Adapta las preguntas EXCLUSIVAMENTE al puesto indicado. NO asumas que es un puesto tecnológico ni uses preguntas de programación, desarrollo o datos salvo que el puesto lo exija explícitamente. Céntrate en las competencias específicas del puesto tal y como ha sido descrito.',
 }
 
 const LEVEL_GUIDE = {
+  sin_exp:
+    'Nivel Sin experiencia: es la primera vez que busca trabajo. Haz preguntas sobre formación académica, prácticas, proyectos personales, valores, motivación y actitud ante el aprendizaje. Sé especialmente paciente y alentadora. NO preguntes por experiencia laboral previa.',
   junior:
-    'Nivel Junior: pregunta sobre fundamentos del área, conceptos básicos, proyectos personales o académicos, motivación, ganas de aprender, actitud ante el error. No exijas experiencia profesional extensa.',
+    'Nivel Junior: tiene 1-2 años de experiencia. Pregunta sobre sus primeros proyectos profesionales, tecnologías o herramientas aprendidas en el trabajo, retos superados, errores y aprendizajes. Puede haber experiencia académica o de prácticas también.',
   media:
-    'Nivel Medio: pregunta sobre experiencia profesional concreta (1-3 proyectos reales), decisiones técnicas u operativas tomadas, resolución de conflictos, trabajo en equipo, resultados medibles.',
+    'Nivel Medio: tiene entre 2 y 5 años de experiencia. Pregunta sobre proyectos reales concretos, decisiones técnicas u operativas tomadas, resolución de conflictos, trabajo en equipo y resultados medibles.',
   senior:
-    'Nivel Senior: pregunta sobre arquitectura, liderazgo de equipos, mentoring, trade-offs estratégicos, impacto en negocio, gestión de stakeholders, decisiones bajo incertidumbre, escala y rendimiento.',
+    'Nivel Senior: más de 5 años de experiencia. Pregunta sobre arquitectura, liderazgo de equipos, mentoring, trade-offs estratégicos, impacto en negocio, gestión de stakeholders, decisiones bajo incertidumbre, escala y rendimiento.',
 }
 
-export function buildInterviewPrompt({ role, sector, level }) {
+export function buildInterviewPrompt({ role, sector, level, name, gender }) {
+  let candidateInfo = ''
+  if (name) candidateInfo += `El candidato se llama ${name}. `
+  if (gender === 'mujer')  candidateInfo += 'Es mujer; usa pronombres y tratamiento femeninos en todo momento (ella, la candidata).'
+  else if (gender === 'hombre') candidateInfo += 'Es hombre; usa pronombres y tratamiento masculinos en todo momento (él, el candidato).'
+  else candidateInfo += 'Usa lenguaje neutro e inclusivo.'
+
   return `Eres una entrevistadora profesional de RRHH realizando una entrevista de trabajo completamente en voz, en español, para el puesto de "${role}" en el sector ${SECTOR_LABEL[sector] || sector}, nivel ${LEVEL_LABEL[level] || level}.
+
+SOBRE EL CANDIDATO:
+${candidateInfo}
 
 REGLAS ESTRICTAS:
 - Habla en español neutro, natural y cordial.
@@ -70,5 +82,5 @@ ENFOQUE POR NIVEL:
 ${LEVEL_GUIDE[level] || LEVEL_GUIDE.media}
 
 INICIO:
-Preséntate brevemente en una frase (inventa un nombre y una empresa ficticia) y haz directamente la primera pregunta de la entrevista. No expliques las reglas al candidato.`
+Preséntate brevemente en una frase con un nombre de mujer y una empresa ficticia, y haz directamente la primera pregunta de la entrevista. No expliques las reglas al candidato.`
 }

@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import SetupScreen from './components/SetupScreen'
 import VoiceUI from './components/VoiceUI'
 
 const STORAGE_KEY = 'entrevistapro-config-v1'
 
-const loadConfig = () => {
+const loadSaved = () => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return null
@@ -15,7 +15,10 @@ const loadConfig = () => {
 }
 
 export default function App() {
-  const [config, setConfig] = useState(loadConfig)
+  // Always start on SetupScreen — never skip it on load
+  const [config, setConfig] = useState(null)
+  // Pre-fill the form with the last saved values (read once, stable ref)
+  const initialConfig = useRef(loadSaved()).current
 
   const handleStart = (cfg) => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg)) } catch { /* ignore */ }
@@ -26,5 +29,5 @@ export default function App() {
 
   return config
     ? <VoiceUI config={config} onChangeSetup={handleChangeSetup} />
-    : <SetupScreen onStart={handleStart} />
+    : <SetupScreen onStart={handleStart} initialConfig={initialConfig} />
 }
