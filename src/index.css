@@ -1,4 +1,3 @@
-/* Estilos base - el resto lo maneja Tailwind */
 * {
   box-sizing: border-box;
   margin: 0;
@@ -7,29 +6,26 @@
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: #080F1C;
+  background: #F0F4FF;
 }
 
 /* ── EntrevistaCV Design System ───────────────────────────────────────────
-   Paleta extraída del logo:
-     Blue brand  #1A73E8   Dark navy bg  #080F1C
-     Orange "CV" #FF6D00   Card bg       #0D1E33
-     Blue dark   #0D47A1   Border        rgba(26,115,232,0.25)
+   Paleta: blanco · azul #1A73E8 · naranja #FF6D00
 ──────────────────────────────────────────────────────────────────────── */
 
 .cv-bg {
-  background: linear-gradient(160deg, #080F1C 0%, #0B1929 50%, #091525 100%);
+  background: linear-gradient(160deg, #FFFFFF 0%, #F0F6FF 60%, #FFF8F0 100%);
   min-height: 100vh;
 }
 
 .cv-header {
-  background: linear-gradient(135deg, #080F1C 0%, #0D1829 100%);
-  border-bottom: 1px solid rgba(26, 115, 232, 0.25);
+  background: #FFFFFF;
+  border-bottom: 2px solid rgba(26, 115, 232, 0.12);
 }
 
 .cv-card {
-  background: linear-gradient(160deg, #0D1E33 0%, #112540 100%);
-  border: 1px solid rgba(26, 115, 232, 0.22);
+  background: #FFFFFF;
+  border: 1px solid rgba(26, 115, 232, 0.18);
 }
 
 /* ── Buttons ───────────────────────────────────────────────────────────── */
@@ -41,13 +37,13 @@ body {
 }
 .cv-btn-primary:hover {
   background: linear-gradient(135deg, #FF8C42 0%, #4D9EFF 100%);
-  box-shadow: 0 4px 24px rgba(26, 115, 232, 0.45);
+  box-shadow: 0 4px 24px rgba(26, 115, 232, 0.35);
 }
 .cv-btn-primary:active {
   transform: scale(0.97);
 }
 .cv-btn-primary:disabled {
-  opacity: 0.4;
+  opacity: 0.35;
   cursor: not-allowed;
 }
 
@@ -57,7 +53,7 @@ body {
   transition: all 0.2s;
 }
 .cv-btn-stop:hover {
-  box-shadow: 0 4px 24px rgba(229, 57, 53, 0.4);
+  box-shadow: 0 4px 24px rgba(229, 57, 53, 0.35);
 }
 .cv-btn-stop:active {
   transform: scale(0.97);
@@ -65,7 +61,6 @@ body {
 
 /* ── Text & gradients ─────────────────────────────────────────────────── */
 
-/* Orange → Blue: matches "Entrevista" (dark) + "CV" (orange) in the logo */
 .cv-title-gradient {
   background: linear-gradient(135deg, #FF6D00 0%, #FF8C42 40%, #1A73E8 100%);
   -webkit-background-clip: text;
@@ -74,7 +69,6 @@ body {
   font-weight: 800;
 }
 
-/* Orange accent for "Tú:" labels etc. */
 .cv-text-gradient {
   background: linear-gradient(135deg, #FF6D00, #FF8C42);
   -webkit-background-clip: text;
@@ -85,26 +79,26 @@ body {
 /* ── Glows ────────────────────────────────────────────────────────────── */
 
 .cv-glow-blue {
-  box-shadow: 0 0 30px rgba(26, 115, 232, 0.4), 0 0 60px rgba(26, 115, 232, 0.12);
+  box-shadow: 0 4px 32px rgba(26, 115, 232, 0.12), 0 1px 6px rgba(0, 0, 0, 0.06);
 }
 .cv-glow-orange {
-  box-shadow: 0 0 30px rgba(255, 109, 0, 0.4), 0 0 60px rgba(255, 109, 0, 0.12);
+  box-shadow: 0 4px 32px rgba(255, 109, 0, 0.18), 0 1px 6px rgba(0, 0, 0, 0.06);
 }
 
 /* ── Input ────────────────────────────────────────────────────────────── */
 
 .cv-input {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(26, 115, 232, 0.35);
-  color: #e8f0fe;
+  background: #FFFFFF;
+  border: 1.5px solid rgba(26, 115, 232, 0.28);
+  color: #1E293B;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 .cv-input::placeholder {
-  color: rgba(100, 160, 220, 0.45);
+  color: #94A3B8;
 }
 .cv-input:focus {
-  border-color: rgba(255, 109, 0, 0.7);
-  box-shadow: 0 0 0 2px rgba(255, 109, 0, 0.15);
+  border-color: #FF6D00;
+  box-shadow: 0 0 0 3px rgba(255, 109, 0, 0.1);
   outline: none;
 }
 .cv-input:disabled {
@@ -114,16 +108,16 @@ body {
 /* ── Orb animations ───────────────────────────────────────────────────── */
 
 @keyframes orbPulseOrange {
-  0%, 100% { box-shadow: 0 0 20px rgba(255, 109, 0, 0.5), 0 0 50px rgba(255, 109, 0, 0.2); }
-  50%       { box-shadow: 0 0 45px rgba(255, 109, 0, 0.8), 0 0 90px rgba(255, 109, 0, 0.35); }
+  0%, 100% { box-shadow: 0 0 20px rgba(255, 109, 0, 0.45), 0 0 50px rgba(255, 109, 0, 0.18); }
+  50%       { box-shadow: 0 0 40px rgba(255, 109, 0, 0.75), 0 0 80px rgba(255, 109, 0, 0.3); }
 }
 @keyframes orbPulseBlue {
-  0%, 100% { box-shadow: 0 0 20px rgba(26, 115, 232, 0.5), 0 0 50px rgba(26, 115, 232, 0.2); }
-  50%       { box-shadow: 0 0 45px rgba(26, 115, 232, 0.8), 0 0 90px rgba(26, 115, 232, 0.35); }
+  0%, 100% { box-shadow: 0 0 20px rgba(26, 115, 232, 0.45), 0 0 50px rgba(26, 115, 232, 0.18); }
+  50%       { box-shadow: 0 0 40px rgba(26, 115, 232, 0.75), 0 0 80px rgba(26, 115, 232, 0.3); }
 }
 @keyframes orbPulseCyan {
-  0%, 100% { box-shadow: 0 0 20px rgba(79, 195, 247, 0.5), 0 0 50px rgba(79, 195, 247, 0.2); }
-  50%       { box-shadow: 0 0 45px rgba(79, 195, 247, 0.8), 0 0 90px rgba(79, 195, 247, 0.35); }
+  0%, 100% { box-shadow: 0 0 20px rgba(79, 195, 247, 0.45), 0 0 50px rgba(79, 195, 247, 0.18); }
+  50%       { box-shadow: 0 0 40px rgba(79, 195, 247, 0.75), 0 0 80px rgba(79, 195, 247, 0.3); }
 }
 
 .orb-listening  { animation: orbPulseOrange 0.9s ease-in-out infinite; }

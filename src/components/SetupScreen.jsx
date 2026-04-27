@@ -25,10 +25,15 @@ export default function SetupScreen({ onStart }) {
       >
         {/* Header */}
         <div className="cv-header px-5 py-5 flex items-center gap-3">
-          <img src={logo} alt="EntrevistaCV" className="w-12 h-12 rounded-xl object-contain bg-white p-0.5" />
+          <img
+            src={logo}
+            alt="EntrevistaCV"
+            className="w-12 h-12 rounded-xl object-contain bg-white p-0.5"
+            style={{ boxShadow: '0 1px 4px rgba(26,115,232,0.15)' }}
+          />
           <div>
             <h1 className="cv-title-gradient text-lg">EntrevistaCV</h1>
-            <p className="text-xs" style={{ color: 'rgba(147,197,253,0.7)' }}>
+            <p className="text-xs" style={{ color: '#64748B' }}>
               Practica entrevistas de trabajo por voz con IA
             </p>
           </div>
@@ -38,7 +43,7 @@ export default function SetupScreen({ onStart }) {
 
           {/* Sector */}
           <div>
-            <label className="block text-xs font-semibold mb-2" style={{ color: '#4D9EFF' }}>
+            <label className="block text-xs font-semibold mb-2" style={{ color: '#1A73E8' }}>
               Sector
             </label>
             <div className="grid grid-cols-3 gap-2">
@@ -49,8 +54,8 @@ export default function SetupScreen({ onStart }) {
                   onClick={() => { setSector(s.id); setRole('') }}
                   className="text-xs rounded-xl px-2 py-2.5 font-medium transition-all"
                   style={sector === s.id
-                    ? { background: 'linear-gradient(135deg,#FF6D00,#1A73E8)', color: 'white', boxShadow: '0 2px 12px rgba(26,115,232,0.35)' }
-                    : { background: 'rgba(26,115,232,0.1)', border: '1px solid rgba(26,115,232,0.28)', color: 'rgba(147,197,253,0.85)' }
+                    ? { background: 'linear-gradient(135deg,#FF6D00,#1A73E8)', color: 'white', boxShadow: '0 2px 12px rgba(26,115,232,0.3)' }
+                    : { background: '#EFF6FF', border: '1px solid #BFDBFE', color: '#1A73E8' }
                   }
                 >
                   {s.label}
@@ -61,7 +66,7 @@ export default function SetupScreen({ onStart }) {
 
           {/* Puesto */}
           <div>
-            <label className="block text-xs font-semibold mb-2" style={{ color: '#4D9EFF' }}>
+            <label className="block text-xs font-semibold mb-2" style={{ color: '#1A73E8' }}>
               ¿A qué puesto te postulas?
             </label>
             <input
@@ -81,13 +86,10 @@ export default function SetupScreen({ onStart }) {
                     type="button"
                     onClick={() => setRole(s)}
                     className="text-xs rounded-full px-3 py-1 transition-all active:scale-95"
-                    style={{
-                      background: role === s
-                        ? 'linear-gradient(135deg,#FF6D00,#1A73E8)'
-                        : 'rgba(26,115,232,0.1)',
-                      border: role === s ? 'none' : '1px solid rgba(26,115,232,0.28)',
-                      color: role === s ? 'white' : '#4D9EFF',
-                    }}
+                    style={role === s
+                      ? { background: 'linear-gradient(135deg,#FF6D00,#1A73E8)', color: 'white' }
+                      : { background: '#EFF6FF', border: '1px solid #BFDBFE', color: '#1A73E8' }
+                    }
                   >
                     {s}
                   </button>
@@ -98,7 +100,7 @@ export default function SetupScreen({ onStart }) {
 
           {/* Dificultad */}
           <div>
-            <label className="block text-xs font-semibold mb-2" style={{ color: '#4D9EFF' }}>
+            <label className="block text-xs font-semibold mb-2" style={{ color: '#1A73E8' }}>
               Dificultad
             </label>
             <div className="grid grid-cols-3 gap-2">
@@ -109,8 +111,8 @@ export default function SetupScreen({ onStart }) {
                   onClick={() => setLevel(l.id)}
                   className="text-xs rounded-xl px-3 py-3 font-medium transition-all flex flex-col items-center gap-0.5"
                   style={level === l.id
-                    ? { background: 'linear-gradient(135deg,#FF6D00,#1A73E8)', color: 'white', boxShadow: '0 2px 12px rgba(26,115,232,0.35)' }
-                    : { background: 'rgba(26,115,232,0.1)', border: '1px solid rgba(26,115,232,0.28)', color: 'rgba(147,197,253,0.85)' }
+                    ? { background: 'linear-gradient(135deg,#FF6D00,#1A73E8)', color: 'white', boxShadow: '0 2px 12px rgba(26,115,232,0.3)' }
+                    : { background: '#EFF6FF', border: '1px solid #BFDBFE', color: '#1A73E8' }
                   }
                 >
                   <span className="font-bold">{l.label}</span>
@@ -129,7 +131,7 @@ export default function SetupScreen({ onStart }) {
             🎙️ Empezar entrevista
           </button>
 
-          <p className="text-xs text-center leading-relaxed" style={{ color: 'rgba(100,160,220,0.5)' }}>
+          <p className="text-xs text-center leading-relaxed" style={{ color: '#94A3B8' }}>
             La entrevista es completamente por voz · Habla, haz una pausa y la IA te responderá
             <br />Permite el uso del micrófono cuando lo solicite el navegador
           </p>
